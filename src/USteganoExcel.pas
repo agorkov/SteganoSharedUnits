@@ -2,21 +2,32 @@ unit USteganoExcel;
 
 interface
 
-procedure WriteMSGToWorkbookAngle(MSG: ANSIString; FileName: string);
-// Сокрытие информации в книге Excel (ориентация ячеек)
-procedure ReadMSGFromWorkbookAngle(var MSG: ANSIString; FileName: string);
-// Чтение информации, сокрытой в книге Excel (оринтация ячеек)
+/// Сокрытие информации в книге Excel (ориентация ячеек)
+procedure WriteMSGToWorkbookAngle(
+  MSG: ANSIString;
+  FileName: string);
 
-procedure WriteMSGToWorkbookSecretSheet(MSG: ANSIString; FileName: string);
-// Сокрытие информации в книге Excel (скрытый лист)
-procedure ReadMSGFromWorkbookSecretSheet(var MSG: ANSIString; FileName: string);
-// Чтение информации, сокрытой в книге Excel (скрытый лист)
+/// Чтение информации, сокрытой в книге Excel (оринтация ячеек)
+procedure ReadMSGFromWorkbookAngle(
+  var MSG: ANSIString;
+  FileName: string);
+
+/// Сокрытие информации в книге Excel (скрытый лист)
+procedure WriteMSGToWorkbookSecretSheet(
+  MSG: ANSIString;
+  FileName: string);
+
+/// Чтение информации, сокрытой в книге Excel (скрытый лист)
+procedure ReadMSGFromWorkbookSecretSheet(
+  var MSG: ANSIString;
+  FileName: string);
 
 var
+  /// Стартовая колонка, куда пишется скрываемая информация
   BaseCol: ANSIString = 'AQ';
-  // Стартовая колонка, куда пишется скрываемая информация
+  /// Стартовая строка, куда пишется скрываемая информация
   BaseRow: LongWord = 47867;
-  // Стартовая строка, куда пишется скрываемая информация
+  /// Название "секретного" листа
   SecretSheetName: ANSIString = 'SecretSheet';
 
 implementation
@@ -25,7 +36,8 @@ uses
   SysUtils, ComObj;
 
 const
-  ValueBitSize = 8; // Размер скрываемой структуры (пока это байт) в битах
+  /// Размер скрываемой структуры (пока это байт) в битах
+  ValueBitSize = 8;
 
   /// Получение определённого бита из заданного байта
   /// Нумерация слева направо от 1 до 7
@@ -56,21 +68,27 @@ begin
 end;
 
 /// Сокрытие информации в книге Excel (ориентация ячеек)
-procedure WriteMSGToWorkbookAngle(MSG: ANSIString; FileName: string);
+procedure WriteMSGToWorkbookAngle(
+  MSG: ANSIString;
+  FileName: string);
 var
   i, j: word;
   c: byte;
   BitMsg: packed array of boolean;
   Excel: Variant;
 begin
-  SetLength(BitMsg, length(MSG) * ValueBitSize + 1);
+  SetLength(
+    BitMsg,
+    length(MSG) * ValueBitSize + 1);
 
   /// Преобразование сообщения в набор бит
   for i := 1 to length(MSG) do
   begin
     c := ord(MSG[i]);
     for j := 1 to ValueBitSize do
-      BitMsg[(i - 1) * ValueBitSize + j] := GetBitByNum(c, j);
+      BitMsg[(i - 1) * ValueBitSize + j] := GetBitByNum(
+        c,
+        j);
   end;
 
   Excel := CreateOleObject('Excel.Application');
@@ -78,15 +96,12 @@ begin
   /// Записываем набор бит в таблицу
   for i := 0 to length(MSG) * ValueBitSize - 1 do
     if BitMsg[i + 1] then
-      Excel.Range[BaseCol + inttostr(BaseRow + i)].Orientation := 1
-      // +1 градус кодирует единичный бит
+      Excel.Range[BaseCol + inttostr(BaseRow + i)].Orientation := 1 // +1 градус кодирует единичный бит
     else
-      Excel.Range[BaseCol + inttostr(BaseRow + i)].Orientation := -1;
-  // -1 градус кодирует нулевой бит
+      Excel.Range[BaseCol + inttostr(BaseRow + i)].Orientation := -1; // -1 градус кодирует нулевой бит
 
   begin
-    /// GorkovAG
-    /// Этот код необходим, чтобы при открытии файл курсор устанавливался на ячейку A1,
+    /// Этот код необходим, чтобы при открытии файла курсор устанавливался на ячейку A1,
     /// а не на ячейку [BaseCol BaseRow]
     Excel.Range['a1'].Orientation := 1;
     Excel.Range['a1'].Orientation := 0;
@@ -96,10 +111,14 @@ begin
   Excel.ActiveWorkbook.Close;
   Excel.Application.Quit;
 
-  SetLength(BitMsg, 0);
+  SetLength(
+    BitMsg,
+    0);
 end;
 
-procedure ReadMSGFromWorkbookAngle(var MSG: ANSIString; FileName: string);
+procedure ReadMSGFromWorkbookAngle(
+  var MSG: ANSIString;
+  FileName: string);
 var
   i, j: word;
   c: byte;
@@ -112,11 +131,11 @@ begin
 
   /// Определяем длину скрытого сообщения
   MsgLength := 0;
-  while (Excel.Range[BaseCol + inttostr(BaseRow + MsgLength)].Orientation = 1)
-    or (Excel.Range[BaseCol + inttostr(BaseRow + MsgLength)
-    ].Orientation = -1) do
+  while (Excel.Range[BaseCol + inttostr(BaseRow + MsgLength)].Orientation = 1) or (Excel.Range[BaseCol + inttostr(BaseRow + MsgLength)].Orientation = -1) do
     MsgLength := MsgLength + 1;
-  SetLength(BitMsg, MsgLength + 1);
+  SetLength(
+    BitMsg,
+    MsgLength + 1);
   /// Считываем закодированную битую строку
   for i := 1 to MsgLength do
   begin
@@ -130,34 +149,64 @@ begin
   begin
     c := 0;
     for j := 1 to 8 do
-      c := SetBitByNum(c, j, byte(BitMsg[(i - 1) * ValueBitSize + j]));
+      c := SetBitByNum(
+        c,
+        j,
+        byte(BitMsg[(i - 1) * ValueBitSize + j]));
     MSG := MSG + ANSIChar(chr(c));
   end;
 
   Excel.ActiveWorkbook.Close;
   Excel.Application.Quit;
 
-  SetLength(BitMsg, 0);
+  SetLength(
+    BitMsg,
+    0);
 end;
 
-procedure WriteMSGToWorkbookSecretSheet(MSG: ANSIString; FileName: string);
+procedure WriteMSGToWorkbookSecretSheet(
+  MSG: ANSIString;
+  FileName: string);
+var
+  i: word;
+  tmp: string;
+  fl: boolean;
 var
   Excel: Variant;
 begin
   Excel := CreateOleObject('Excel.Application');
   Excel.Workbooks.Open[FileName];
-  /// Создаём скрытый лист и записываем туда необходимую информацию
-  Excel.ActiveWorkbook.Sheets.Add;
-  Excel.Range['a1'] := string(MSG);
-  Excel.ActiveWorkbook.ActiveSheet.Name := SecretSheetName;
-  Excel.ActiveWorkbook.ActiveSheet.Visible := false;
+
+  fl := false;
+  /// Проверяем, существует ли скрытый лист
+  for i := 1 to Excel.ActiveWorkbook.Sheets.Count do
+  begin
+    tmp := Excel.ActiveWorkbook.Sheets.Item[i].Name;
+    if Excel.ActiveWorkbook.Sheets.Item[i].Name = SecretSheetName then
+    begin
+      /// Если лист уже существует, записываем новую информацию
+      Excel.ActiveWorkbook.Sheets.Item[i].Range['a1'] := string(MSG);
+      fl := true;
+      break;
+    end;
+  end;
+  if not fl then
+  /// Если скрытого листа нет, создаём его и записываем туда необходимую информацию
+  begin
+    Excel.ActiveWorkbook.Sheets.Add;
+    Excel.Range['a1'] := string(MSG);
+    Excel.ActiveWorkbook.ActiveSheet.Name := SecretSheetName;
+    Excel.ActiveWorkbook.ActiveSheet.Visible := false;
+  end;
 
   Excel.ActiveWorkbook.Save;
   Excel.ActiveWorkbook.Close;
   Excel.Application.Quit;
 end;
 
-procedure ReadMSGFromWorkbookSecretSheet(var MSG: ANSIString; FileName: string);
+procedure ReadMSGFromWorkbookSecretSheet(
+  var MSG: ANSIString;
+  FileName: string);
 var
   Excel: Variant;
   i: word;
